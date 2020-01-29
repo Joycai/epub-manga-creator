@@ -6,7 +6,8 @@
   "scripts": {
     "start": "rm -rf ./dist; mkdir dist; webpack-dev-server --config webpack.dev.config.js --port 3000",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "rm -rf ./dist; mkdir dist; webpack --config webpack.deploy.config.js"
+    "build2": "rm -rf ./dist; mkdir dist; webpack --config webpack.deploy.config.js",
+    "build": "webpack --config webpack.deploy.config.js"
   },
   "repository": {
     "type": "git",
