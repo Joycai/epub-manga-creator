@@ -3,11 +3,13 @@ import { observer } from 'mobx-react'
 import React, { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import Icon from 'components/icon'
 import storeMain from 'store/main'
-// import storeBlobs from 'store/blobs'
+import { useI18n } from 'i18n'
+import type { LangKey } from 'i18n'
 
 type SupportType = 'image' | 'zip' | 'epub'
 
 const PageControl = observer(function(props: { pageIndex: number | null }) {
+  const t = useI18n()
   const onUseImageSizeToPage = useCallback(() => {
     const pageItem = storeMain.book.pages[props.pageIndex as number]
     const image = storeMain.blobs.blobs[pageItem.blobID].originImage
@@ -19,7 +21,7 @@ const PageControl = observer(function(props: { pageIndex: number | null }) {
 
   const onChangePageIndex = useCallback(() => {
     const max = storeMain.book.pages.length
-    const inputValue = window.prompt(`new page index (1 - ${max}):`)
+    const inputValue = window.prompt(t.prompt.newPageIndex(max))
     let num = parseInt(inputValue || '')
     
     if (isNaN(num) || num < 1) {
@@ -43,7 +45,7 @@ const PageControl = observer(function(props: { pageIndex: number | null }) {
   }, [props.pageIndex])
 
   const onRemovePage = useCallback(() => {
-    const res = window.confirm(`remove page index ${props.pageIndex as number + 1}?`)
+    const res = window.confirm(t.prompt.removePage(props.pageIndex as number))
     res && storeMain.removePage(props.pageIndex as number)
   }, [props.pageIndex])
 
@@ -140,7 +142,8 @@ const blobToFile = (theBlob: Blob, fileName:string): File => {
 const Header = function() {
   const store = React.useContext(React.createContext(storeMain.ui))
   const inputRef = useRef<HTMLInputElement>(null)
-  const [inputType, setInputType] = useState<SupportType>('zip') // 修改这个可以改默认格式
+  const [inputType, setInputType] = useState<SupportType>('zip')
+  const t = useI18n()
 
   const onClickToggleBookVisible = useCallback(() => {
     store.toggleBookVisible()
@@ -209,7 +212,7 @@ const Header = function() {
               }
 
               if (mimeType) {
-                const b = new Blob([uint8Array], { type: mimeType })
+                const b = new Blob([uint8Array as any], { type: mimeType })
                 resolve(
                   blobToFile(
                     b,
@@ -239,7 +242,7 @@ const Header = function() {
 
   const onClickInsertBlankPage = useCallback(() => {
     const max = storeMain.book.pages.length
-    const inputValue = window.prompt(`page index (1 - ${max}):`)
+    const inputValue = window.prompt(t.prompt.insertPageIndex(max))
     let num = parseInt(inputValue || '')
     
     if (isNaN(num) || num < 1) {
@@ -252,7 +255,14 @@ const Header = function() {
   }, [])
 
   const onClickGenerate = useCallback(() => {
-    storeMain.generateBook()
+    storeMain.generateBook().then((blob) => {
+      const anchor = document.createElement('a')
+      const objectURL = window.URL.createObjectURL(blob)
+      anchor.download = storeMain.book.bookTitle.trim() + '.epub'
+      anchor.href = objectURL
+      anchor.click()
+      window.URL.revokeObjectURL(objectURL)
+    })
   }, [])
 
   useLayoutEffect(() => {
@@ -268,9 +278,8 @@ const Header = function() {
           <Icon name="upload"/>
         </button>
         <ul className="dropdown-menu" style={{top: 0,left:'100%'}}>
-          <li><span className="dropdown-item" data-type="image" onClick={onClickImport}>image</span></li>
-          <li><span className="dropdown-item" data-type="zip" onClick={onClickImport}>zip</span></li>
-          {/* <li><span className="dropdown-item" data-type="epub" onClick={onClickImport}>epub</span></li> */}
+          <li><span className="dropdown-item" data-type="image" onClick={onClickImport}>{t.nav.importImage}</span></li>
+          <li><span className="dropdown-item" data-type="zip" onClick={onClickImport}>{t.nav.importZip}</span></li>
         </ul>
       </div>
       <div className="nav-item">
@@ -303,6 +312,19 @@ const Header = function() {
         </button>
       </div>
       <PageControl pageIndex={store.selectedPageIndex}/>
+      <div className="nav-item" style={{marginTop:'auto'}}>
+        <button
+          type="button"
+          className="btn btn-outline-light btn-sm"
+          style={{fontSize:'12px',width:'50px'}}
+          onClick={() => {
+            const next: LangKey = storeMain.ui.lang === 'en' ? 'zh' : 'en'
+            storeMain.ui.setLang(next)
+          }}
+        >
+          {storeMain.ui.lang === 'en' ? t.lang.zh : t.lang.en}
+        </button>
+      </div>
       <input
         key={inputType}
         id="input-upload"

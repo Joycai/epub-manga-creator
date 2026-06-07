@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, main, new-gen-v1 ]
+  pull_request:
+    branches: [ master, main, new-gen-v1 ]
+
+jobs:
+  build:
+    name: Build & Verify
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 11
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and Compile check
+        run: pnpm build

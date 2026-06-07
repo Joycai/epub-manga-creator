@@ -1,4 +1,16 @@
-import { makeAutoObservable, observable, action } from "mobx"
+import { makeAutoObservable, observable, action } from 'mobx'
+import type { LangKey } from 'i18n'
+
+const STORAGE_LANG_KEY = 'EPUB_CREATOR_LANG'
+
+function detectDefaultLang(): LangKey {
+  if (typeof window === 'undefined') return 'en'
+  const saved = localStorage.getItem(STORAGE_LANG_KEY)
+  if (saved === 'en' || saved === 'zh') return saved
+  // auto-detect from browser
+  const nav = navigator.language || ''
+  return nav.startsWith('zh') ? 'zh' : 'en'
+}
 
 class Store {
   @observable modalBookVisible = false
@@ -7,11 +19,13 @@ class Store {
   @observable maxCardBoxCountInOneRow = 0
   @observable selectedPageIndex: number | null = null
   @observable fileName = ``
+  @observable lang: LangKey = 'en'
 
   firstImport = true
 
   constructor() {
     makeAutoObservable(this)
+    this.lang = detectDefaultLang()
   }
 
   @action
@@ -53,6 +67,14 @@ class Store {
       this.selectedPageIndex = null
     } else {
       this.selectedPageIndex = index
+    }
+  }
+
+  @action
+  setLang(lang: LangKey) {
+    this.lang = lang
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_LANG_KEY, lang)
     }
   }
 }

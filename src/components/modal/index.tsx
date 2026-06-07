@@ -4,6 +4,7 @@ import { observer } from 'mobx-react'
 import { toJS } from 'mobx'
 import deepClone from 'utils/deep-clone'
 import Icon from 'components/icon'
+import { useI18n } from 'i18n'
 
 import 'components/modal/index.css'
 
@@ -41,6 +42,7 @@ const KeywordPicker = function(props: { keywords: string[], onClick: (str: strin
 }
 
 const ModalBook = observer(function() {
+  const t = useI18n()
   const storeUI = React.useContext(React.createContext(storeMain.ui))
   const storeBook = React.useContext(React.createContext(storeMain.book))
   const setsSeletRef = React.useRef<HTMLSelectElement>(null)
@@ -51,7 +53,7 @@ const ModalBook = observer(function() {
 
   const keywordsLength = keywords.length
 
-  const onClickModal = useCallback((e) => {
+  const onClickModal = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
     return
   }, [])
@@ -240,12 +242,12 @@ const ModalBook = observer(function() {
     <div className="modal-dialog modal-lg" onClick={onClickModal}>
       <div className="modal-content">
         <div className="modal-header">
-          <h5 className="modal-title">Book</h5>
+          <h5 className="modal-title">{t.book.modalTitle}</h5>
           <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close" onClick={onClickClose}></button>
         </div>
         <div className="modal-body" onClick={onClickModalBody}>
           <div className="mb-3 row">
-            <label htmlFor="input-filename" className="col-sm-2 col-form-label text-end">filename</label>
+            <label htmlFor="input-filename" className="col-sm-2 col-form-label text-end">{t.book.filename}</label>
             <div className="col-sm-10">
               <div className="input-group">
                 <input type="text" className="form-control" id="input-filename" value={fileName} onInput={onChangeFileName}/>
@@ -260,13 +262,13 @@ const ModalBook = observer(function() {
             </div>
           </div>
           <div className="mb-3 row">
-            <label htmlFor="input-book-id" className="col-sm-2 col-form-label text-end">id</label>
+            <label htmlFor="input-book-id" className="col-sm-2 col-form-label text-end">{t.book.id}</label>
             <div className="col-sm-10">
               <input type="text" className="form-control" id="input-book-id" value={storeBook.bookID} onInput={onChangeBookID}/>
             </div>
           </div>
           <div className="mb-3 row">
-            <label htmlFor="input-book-title" className="col-sm-2 col-form-label text-end">title</label>
+            <label htmlFor="input-book-title" className="col-sm-2 col-form-label text-end">{t.book.title}</label>
             <div className="col-sm-10">
               <input type="text" className="form-control" id="input-book-title" value={storeBook.bookTitle} onInput={onChangeBookTitle}/>
               <div className={keywordsLength ? "mt-3" : ''}>
@@ -275,7 +277,7 @@ const ModalBook = observer(function() {
             </div>
           </div>
           <div className="mb-3 row">
-            <label htmlFor="input-book-author" className="col-sm-2 col-form-label text-end">author</label>
+            <label htmlFor="input-book-author" className="col-sm-2 col-form-label text-end">{t.book.author}</label>
             <div className="col-sm-10">
               {
                 storeBook.bookAuthors.map((name: string, index: number) => (
@@ -307,7 +309,7 @@ const ModalBook = observer(function() {
             </div>
           </div>
           <div className="mb-3 row">
-            <label htmlFor="input-book-subject" className="col-sm-2 col-form-label text-end">subject</label>
+            <label htmlFor="input-book-subject" className="col-sm-2 col-form-label text-end">{t.book.subject}</label>
             <div className="col-sm-10">
               <input type="text" className="form-control" list="dl-subject" id="input-book-subject" value={storeBook.bookSubject} onInput={onChangeBookSubject}/>
               <datalist id="dl-subject">
@@ -321,7 +323,7 @@ const ModalBook = observer(function() {
             </div>
           </div>
           <div className="mb-3 row">
-            <label htmlFor="input-book-publisher" className="col-sm-2 col-form-label text-end">publisher</label>
+            <label htmlFor="input-book-publisher" className="col-sm-2 col-form-label text-end">{t.book.publisher}</label>
             <div className="col-sm-10">
               <input type="text" className="form-control" list="dl-publisher" id="input-book-publisher" value={storeBook.bookPublisher} onInput={onChangeBookPublisher}/>
               <datalist id="dl-publisher">
@@ -345,15 +347,15 @@ const ModalBook = observer(function() {
           </div>
         </div>
         <div className="modal-footer justify-content-start">
-          <button type="button" className="btn btn-sm btn-outline-primary" onClick={onClickSaveSet}>save set</button>
+          <button type="button" className="btn btn-sm btn-outline-primary" onClick={onClickSaveSet}>{t.book.saveSet}</button>
           <select className="form-select form-select-sm" value={selectedSetIndex + ''} defaultChecked={false} ref={setsSeletRef} style={{width: '200px'}} onChange={onApplySet}>
             {
               storeBook.savedSets.map((set, index) =>
-                <option defaultChecked={false} key={index} value={index}>title: {set.bookTitle}, author: {set.bookAuthors[0]}, subject: {set.bookSubject}</option>
+                <option defaultChecked={false} key={index} value={index}>{t.book.title}: {set.bookTitle}, {t.book.author}: {set.bookAuthors[0]}, {t.book.subject}: {set.bookSubject}</option>
               )
             }
           </select>
-          <button type="button" disabled={selectedSetIndex === -1} className="btn btn-sm btn-outline-danger" onClick={onClickRemoveSet}>remove set</button>
+          <button type="button" disabled={selectedSetIndex === -1} className="btn btn-sm btn-outline-danger" onClick={onClickRemoveSet}>{t.book.removeSet}</button>
         </div>
       </div>
     </div>
@@ -361,6 +363,7 @@ const ModalBook = observer(function() {
 })
 
 const ModalContents = observer(function() {
+  const t = useI18n()
   const store = React.useContext(React.createContext(storeMain.ui))
   const setsSeletRef = React.useRef<HTMLSelectElement>(null)
   const [plainMode, setPlainMode] = useState(false)
@@ -369,7 +372,7 @@ const ModalContents = observer(function() {
   const [selectedSetIndex, setSelectedSetIndex] = useState(-1)
   const maxIndex = tempList.length - 1
 
-  const onClickModal = useCallback((e) => {
+  const onClickModal = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
     return
   }, [])
@@ -526,7 +529,7 @@ const ModalContents = observer(function() {
     <div className="modal-dialog modal-lg" onClick={onClickModal}>
       <div className="modal-content">
         <div className="modal-header">
-          <h5 className="modal-title">Content</h5>
+          <h5 className="modal-title">{t.contents.modalTitle}</h5>
           <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close" onClick={onClickClose}></button>
         </div>
         <div className="modal-body" onClick={onClickModalBody}>
@@ -535,7 +538,7 @@ const ModalContents = observer(function() {
               <textarea
                 cols={30}
                 rows={10}
-                placeholder="eg: \n 1. cover \n 2. xxxx \n 3.xxxx"
+                placeholder={t.contents.placeholder}
                 className="form-control"
                 style={{resize: 'none'}}
                 value={textAreaInput}
@@ -545,10 +548,10 @@ const ModalContents = observer(function() {
               <>
                 <div className="row mb-2">
                   <div className="col-2">
-                    <h6>index</h6>
+                    <h6>{t.contents.colIndex}</h6>
                   </div>
                   <div className="col-6">
-                    <h6>title</h6>
+                    <h6>{t.contents.colTitle}</h6>
                   </div>
                   <div className="col-auto"></div>
                 </div>
@@ -588,7 +591,7 @@ const ModalContents = observer(function() {
         {
           plainMode ? null : (
             <div className="modal-footer justify-content-start">
-              <button type="button" className="btn btn-sm btn-outline-primary" onClick={onClickSaveSet}>save set</button>
+              <button type="button" className="btn btn-sm btn-outline-primary" onClick={onClickSaveSet}>{t.contents.saveSet}</button>
               <select className="form-select form-select-sm" key={selectedSetIndex} value={selectedSetIndex + ''} defaultChecked={false} ref={setsSeletRef} style={{width: '200px'}} onChange={onApplySet}>
                 {
                   storeMain.contents.savedSets.map((set, index) =>
@@ -596,19 +599,19 @@ const ModalContents = observer(function() {
                   )
                 }
               </select>
-              <button type="button" disabled={selectedSetIndex === -1} className="btn btn-sm btn-outline-danger" onClick={onClickRemoveSet}>remove set</button>
+              <button type="button" disabled={selectedSetIndex === -1} className="btn btn-sm btn-outline-danger" onClick={onClickRemoveSet}>{t.contents.removeSet}</button>
             </div>
           )
         }
         <div className="modal-footer justify-content-start">
           <button type="button" className="btn btn-outline-primary" onClick={togglePlainMode}>
-            {plainMode ? 'form mode' : 'plain text mode'}
+            {plainMode ? t.contents.formMode : t.contents.plainMode}
           </button>
           <button type="button" disabled={plainMode} className="btn btn-outline-primary me-auto" onClick={onSortList}>
-            sort
+            {t.contents.sort}
           </button>
           <button type="button" disabled={plainMode} className="btn btn-primary" onClick={onSave}>
-            Save
+            {t.contents.save}
           </button>
         </div>
       </div>
@@ -635,10 +638,11 @@ const ButtonRadio = function(props: { value: any; current: any; label: string; o
 }
 
 const ModalPage = observer(function() {
+  const t = useI18n()
   const store = React.useContext(React.createContext(storeMain.ui))
   const storeBook = React.useContext(React.createContext(storeMain.book))
 
-  const onClickModal = useCallback((e) => {
+  const onClickModal = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
     return
   }, [])
@@ -669,25 +673,25 @@ const ModalPage = observer(function() {
     let func = PAGE_SIZE[key]
     storeBook.updateBookPageProperty('pageSize', func())
   }, [storeBook])
-  const onChangePagePosition = useCallback((value) => {
+  const onChangePagePosition = useCallback((value: 'center' | 'between') => {
     storeBook.updateBookPageProperty('pagePosition', value)
   }, [storeBook])
-  const onChangePageShow = useCallback((value) => {
+  const onChangePageShow = useCallback((value: 'one' | 'two') => {
     storeBook.updateBookPageProperty('pageShow', value)
   }, [storeBook])
-  const onChangePageFit = useCallback((value) => {
+  const onChangePageFit = useCallback((value: 'stretch' | 'fit' | 'fill') => {
     storeBook.updateBookPageProperty('pageFit', value)
   }, [storeBook])
   // const onChangePageBackgroundColor = useCallback((value) => {
   //   storeBook.updateBookPageProperty('pageBackgroundColor', value)
   // }, [storeBook])
-  const onChangePageDirection = useCallback((value) => {
+  const onChangePageDirection = useCallback((value: 'left' | 'right') => {
     storeBook.updateBookPageProperty('pageDirection', value)
   }, [storeBook])
-  const onChangeCoverPosition = useCallback((value) => {
+  const onChangeCoverPosition = useCallback((value: 'first-page' | 'alone') => {
     storeBook.updateBookPageProperty('coverPosition', value)
   }, [storeBook])
-  const onChangeImageTag = useCallback((value) => {
+  const onChangeImageTag = useCallback((value: 'svg' | 'img') => {
     storeBook.updateBookPageProperty('imgTag', value)
   }, [storeBook])
 
@@ -695,12 +699,12 @@ const ModalPage = observer(function() {
     <div className="modal-dialog modal-md" onClick={onClickModal}>
       <div className="modal-content">
         <div className="modal-header">
-          <h5 className="modal-title">Page</h5>
+          <h5 className="modal-title">{t.page.modalTitle}</h5>
           <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close" onClick={onClickClose}></button>
         </div>
         <div className="modal-body">
           <div className="mb-2 row">
-            <label className="col-3 col-form-label text-end">size</label>
+            <label className="col-3 col-form-label text-end">{t.page.size}</label>
             <div className="col-9 d-flex align-items-center">
               <div className="row justify-content-between">
                 <div className="col-5 d-flex align-items-center">
@@ -749,25 +753,25 @@ const ModalPage = observer(function() {
             </div>
           </div>
           <div className="mb-2 row">
-            <label htmlFor="input-page-position" className="col-3 col-form-label text-end">position</label>
+            <label htmlFor="input-page-position" className="col-3 col-form-label text-end">{t.page.position}</label>
             <div className="col-9 d-flex align-items-center">
-              <ButtonRadio current={storeBook.pagePosition} value="center" label="center" onClick={onChangePagePosition} />
-              <ButtonRadio current={storeBook.pagePosition} value="between" label="between" onClick={onChangePagePosition} />
+              <ButtonRadio current={storeBook.pagePosition} value="center" label={t.option.center} onClick={onChangePagePosition} />
+              <ButtonRadio current={storeBook.pagePosition} value="between" label={t.option.between} onClick={onChangePagePosition} />
             </div>
           </div>
           <div className="mb-2 row">
-            <label className="col-3 col-form-label text-end">show</label>
+            <label className="col-3 col-form-label text-end">{t.page.show}</label>
             <div className="col-9 d-flex align-items-center">
-              <ButtonRadio current={storeBook.pageShow} value="two" label="two pages" onClick={onChangePageShow} />
-              <ButtonRadio current={storeBook.pageShow} value="one" label="one page" onClick={onChangePageShow} />
+              <ButtonRadio current={storeBook.pageShow} value="two" label={t.option.twoPages} onClick={onChangePageShow} />
+              <ButtonRadio current={storeBook.pageShow} value="one" label={t.option.onePage} onClick={onChangePageShow} />
             </div>
           </div>
           <div className="mb-2 row">
-            <label className="col-3 col-form-label text-end">fit</label>
+            <label className="col-3 col-form-label text-end">{t.page.fit}</label>
             <div className="col-9 d-flex align-items-center">
-              <ButtonRadio current={storeBook.pageFit} value="stretch" label="stretch" onClick={onChangePageFit} />
-              <ButtonRadio current={storeBook.pageFit} value="fit" label="fit" onClick={onChangePageFit} />
-              <ButtonRadio current={storeBook.pageFit} value="fill" label="fill" onClick={onChangePageFit} />
+              <ButtonRadio current={storeBook.pageFit} value="stretch" label={t.option.stretch} onClick={onChangePageFit} />
+              <ButtonRadio current={storeBook.pageFit} value="fit" label={t.option.fit} onClick={onChangePageFit} />
+              <ButtonRadio current={storeBook.pageFit} value="fill" label={t.option.fill} onClick={onChangePageFit} />
             </div>
           </div>
           {
@@ -780,21 +784,21 @@ const ModalPage = observer(function() {
             // </div>
           }
           <div className="mb-2 row">
-            <label className="col-3 col-form-label text-end">direction</label>
+            <label className="col-3 col-form-label text-end">{t.page.direction}</label>
             <div className="col-9 d-flex align-items-center">
-              <ButtonRadio current={storeBook.pageDirection} value="right" label="right (japanese style)" onClick={onChangePageDirection} />
-              <ButtonRadio current={storeBook.pageDirection} value="left" label="left" onClick={onChangePageDirection} />
+              <ButtonRadio current={storeBook.pageDirection} value="right" label={t.option.rightJP} onClick={onChangePageDirection} />
+              <ButtonRadio current={storeBook.pageDirection} value="left" label={t.option.left} onClick={onChangePageDirection} />
             </div>
           </div>
           <div className="mb-2 row">
-            <label className="col-3 col-form-label text-end">cover</label>
+            <label className="col-3 col-form-label text-end">{t.page.cover}</label>
             <div className="col-9 d-flex align-items-center">
-              <ButtonRadio current={storeBook.coverPosition} value="first-page" label="first page" onClick={onChangeCoverPosition} />
-              <ButtonRadio current={storeBook.coverPosition} value="alone" label="alone" onClick={onChangeCoverPosition} />
+              <ButtonRadio current={storeBook.coverPosition} value="first-page" label={t.option.firstPage} onClick={onChangeCoverPosition} />
+              <ButtonRadio current={storeBook.coverPosition} value="alone" label={t.option.alone} onClick={onChangeCoverPosition} />
             </div>
           </div>
           <div className="mb-2 row">
-            <label className="col-3 col-form-label text-end">image tag</label>
+            <label className="col-3 col-form-label text-end">{t.page.imageTag}</label>
             <div className="col-9 d-flex align-items-center">
               <ButtonRadio current={storeBook.imgTag} value="svg" label="<svg />" onClick={onChangeImageTag} />
               <ButtonRadio current={storeBook.imgTag} value="img" label="<img />" onClick={onChangeImageTag} />

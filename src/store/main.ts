@@ -6,7 +6,6 @@ import Contents from 'store/contents'
 import storeBlobs, { Store as Blobs } from 'store/blobs'
 import JSZip from "jszip"
 
-import 'template/mimetype'
 import getTemplateContainerXml from 'template/container.xml'
 import getTemplatePageXhtml from 'template/page.xhtml'
 import getTemplatePageImgXhtml from 'template/page_img.xhtml'
@@ -52,14 +51,16 @@ class Store {
 
     makeAutoObservable(this)
 
-    try {
-      const bookSets = JSON.parse(localStorage.getItem('EPUB_CREATOR_SAVED_SETS_BOOK') || '[]')
-      const contentSets = JSON.parse(localStorage.getItem('EPUB_CREATOR_SAVED_SETS_CONTENTS') || '[]')
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      try {
+        const bookSets = JSON.parse(localStorage.getItem('EPUB_CREATOR_SAVED_SETS_BOOK') || '[]')
+        const contentSets = JSON.parse(localStorage.getItem('EPUB_CREATOR_SAVED_SETS_CONTENTS') || '[]')
 
-      this.book.savedSets = bookSets
-      this.contents.savedSets = contentSets
-    } catch {
-      // do nothing
+        this.book.savedSets = bookSets
+        this.contents.savedSets = contentSets
+      } catch {
+        // do nothing
+      }
     }
   }
 
@@ -68,7 +69,7 @@ class Store {
     const uuids = fileList.map(() => uuid())
 
     this.book.pushNewPage(uuids)
-    this.blobs.push(fileList, uuids)
+    this.blobs.push(fileList, uuids, this.ui.lang)
   }
 
   @action
@@ -133,7 +134,7 @@ class Store {
 
     this.book.splitPage(index, uuids)
     this.book.updatePageItemIndex()
-    this.blobs.push(blobs, this.book.pageDirection === 'left' ? uuids : uuids.reverse())
+    this.blobs.push(blobs, this.book.pageDirection === 'left' ? uuids : uuids.reverse(), this.ui.lang)
 
     const list = toJS(this.contents.list)
     list.forEach(contentItem => {
@@ -389,16 +390,9 @@ class Store {
     Zip.file('OEBPS/navigation-documents.xhtml', templateNavigationDocumentsXhtml)
     Zip.file('OEBPS/standard.opf', templateStandardOpf)
 
-    Zip.generateAsync({
+    return Zip.generateAsync({
       type: 'blob',
       mimeType: 'application/epub+zip'
-    }).then(blob => {
-      const anchor = document.createElement('a')
-      const objectURL = window.URL.createObjectURL(blob)
-      anchor.download = this.book.bookTitle.trim() + '.epub'
-      anchor.href = objectURL
-      anchor.click()
-      window.URL.revokeObjectURL(objectURL)
     })
   }
 }
@@ -406,8 +400,10 @@ class Store {
 const store = new Store()
 
 autorun(() => {
-  localStorage.setItem('EPUB_CREATOR_SAVED_SETS_BOOK', JSON.stringify(toJS(store.book.savedSets)))
-  localStorage.setItem('EPUB_CREATOR_SAVED_SETS_CONTENTS', JSON.stringify(toJS(store.contents.savedSets)))
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    localStorage.setItem('EPUB_CREATOR_SAVED_SETS_BOOK', JSON.stringify(toJS(store.book.savedSets)))
+    localStorage.setItem('EPUB_CREATOR_SAVED_SETS_CONTENTS', JSON.stringify(toJS(store.contents.savedSets)))
+  }
 })
 
 export default store

@@ -1,4 +1,4 @@
-const getText = () =>`@charset "UTF-8";
+const getText = (): string => `@charset "UTF-8";
 
 html,
 body {

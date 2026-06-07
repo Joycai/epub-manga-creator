@@ -1,4 +1,6 @@
 import { action, makeAutoObservable, observable, runInAction } from "mobx"
+import { getLocale, LangKey } from 'i18n'
+
 
 export declare namespace StoreBlobs {
   export interface ImageBlob {
@@ -63,14 +65,15 @@ class Store {
   }
 
   @action
-  async push(blobs: Blob[], uuids: string[]) {
+  async push(blobs: Blob[], uuids: string[], lang?: LangKey) {
     let formatBlobs: StoreBlobs.ImageBlob[] = []
 
     try {
       formatBlobs = await Promise.all(blobs.map(formatBlobItem))
     } catch (err) {
       console.error(err)
-      alert('错误\nError')
+      const errorMsg = lang ? getLocale(lang).alert.error : '错误\nError'
+      alert(errorMsg)
       return
     }
 
@@ -91,4 +94,5 @@ class Store {
 }
 
 export { Store }
-export default new Store()
+const store = new Store()
+export default store

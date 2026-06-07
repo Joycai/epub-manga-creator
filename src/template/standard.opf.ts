@@ -1,4 +1,4 @@
-const getText = () => `<?xml version="1.0" encoding="UTF-8"?>
+const getText = (): string => `<?xml version="1.0" encoding="UTF-8"?>
 <package
   xmlns="http://www.idpf.org/2007/opf"
   version="3.0"
@@ -26,10 +26,10 @@ const getText = () => `<?xml version="1.0" encoding="UTF-8"?>
 <dc:publisher id="publisher">{{publisher}}</dc:publisher>
 <meta refines="#publisher" property="file-as"></meta>
 
-<!-- 言語 -->
+<!-- 言语 -->
 <dc:language>ja</dc:language>
 
-<!-- ファイルid -->
+<!-- 文件id -->
 <dc:identifier id="unique-id">urn:uuid:{{uuid}}</dc:identifier>
 
 <!-- 更新日 -->

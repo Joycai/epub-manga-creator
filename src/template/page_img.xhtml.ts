@@ -1,4 +1,4 @@
-const getText = () => `<?xml version="1.0" encoding="UTF-8"?>
+const getText = (): string => `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
 <html
  xmlns="http://www.w3.org/1999/xhtml"
@@ -10,14 +10,11 @@ const getText = () => `<?xml version="1.0" encoding="UTF-8"?>
 <title>{{title}}</title>
 <link rel="stylesheet" type="text/css" href="../style/fixed-layout-jp.css"/>
 <meta name="viewport" content="width={{width}}, height={{height}}"/>
+<style>img{width:{{width}}px;height:{{height}}px}</style>
 </head>
 <body>
 <div class="main">
-<svg xmlns="http://www.w3.org/2000/svg" version="1.1"
- xmlns:xlink="http://www.w3.org/1999/xlink"
- width="100%" height="100%" viewBox="0 0 {{width}} {{height}}">
-{{image}}
-</svg>
+<img src="{{imageSource}}" style="{{style}}"/>
 </div>
 </body>
 </html>`
