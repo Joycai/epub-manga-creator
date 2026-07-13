@@ -199,7 +199,7 @@ const Header = function() {
               }
 
               if (mimeType) {
-                const b = new Blob([uint8Array], { type: mimeType })
+                const b = new Blob([new Uint8Array(uint8Array)], { type: mimeType })
                 resolve(
                   blobToFile(
                     b,
@@ -243,6 +243,19 @@ const Header = function() {
   const onClickGenerate = useCallback(() => {
     storeMain.generateBook()
   }, [storeMain])
+
+  const onCycleTheme = useCallback(() => {
+    ui.cycleTheme()
+  }, [ui])
+
+  const onClickReset = useCallback(() => {
+    const message = ui.lang === 'zh'
+      ? '确定要清空工作区吗？所有已导入的页面都将被移除，此操作不可撤销。'
+      : 'Clear the workspace? All imported pages will be removed. This cannot be undone.'
+    if (window.confirm(message)) {
+      storeMain.resetWorkspace()
+    }
+  }, [ui, storeMain])
 
   useLayoutEffect(() => {
     if (inputType) {
@@ -291,6 +304,32 @@ const Header = function() {
         </button>
       </div>
       <PageControl pageIndex={ui.selectedPageIndex}/>
+      <div className="nav-item nav-bottom-group">
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={onCycleTheme}
+          title={
+            (ui.lang === 'zh'
+              ? { light: '主题：浅色', dark: '主题：深色', auto: '主题：跟随系统' }
+              : { light: 'Theme: Light', dark: 'Theme: Dark', auto: 'Theme: Auto (system)' }
+            )[ui.theme]
+          }
+        >
+          <Icon name={ui.theme === 'light' ? 'sun' : ui.theme === 'dark' ? 'moon' : 'theme-auto'}/>
+        </button>
+      </div>
+      <div className="nav-item">
+        <button
+          type="button"
+          className="btn btn-secondary nav-reset-btn"
+          disabled={book.pages.length === 0}
+          onClick={onClickReset}
+          title={ui.lang === 'zh' ? '清空工作区' : 'Reset workspace'}
+        >
+          <Icon name="trash"/>
+        </button>
+      </div>
       <input
         key={inputType}
         id="input-upload"

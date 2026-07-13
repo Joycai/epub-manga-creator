@@ -4,6 +4,9 @@ import type { LangKey } from 'i18n'
 const STORAGE_LANG_KEY = 'EPUB_CREATOR_LANG'
 const STORAGE_THEME_KEY = 'EPUB_CREATOR_THEME'
 
+export type ThemeMode = 'dark' | 'light' | 'auto'
+const THEME_CYCLE: ThemeMode[] = ['light', 'dark', 'auto']
+
 function detectDefaultLang(): LangKey {
   if (typeof window === 'undefined') return 'en'
   const saved = localStorage.getItem(STORAGE_LANG_KEY)
@@ -13,14 +16,19 @@ function detectDefaultLang(): LangKey {
   return nav.startsWith('zh') ? 'zh' : 'en'
 }
 
-function detectDefaultTheme(): 'dark' | 'light' {
-  if (typeof window === 'undefined') return 'dark'
+function detectDefaultTheme(): ThemeMode {
+  if (typeof window === 'undefined') return 'auto'
   const saved = localStorage.getItem(STORAGE_THEME_KEY)
-  if (saved === 'dark' || saved === 'light') return saved
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
-    return 'light'
+  if (saved === 'dark' || saved === 'light' || saved === 'auto') return saved
+  return 'auto'
+}
+
+function resolveTheme(theme: ThemeMode): 'dark' | 'light' {
+  if (theme !== 'auto') return theme
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   }
-  return 'dark'
+  return 'light'
 }
 
 class Store {
@@ -31,7 +39,7 @@ class Store {
   @observable selectedPageIndex: number | null = null
   @observable fileName = ``
   @observable lang: LangKey = 'en'
-  @observable theme: 'dark' | 'light' = 'dark'
+  @observable theme: ThemeMode = 'auto'
   @observable isLoading = false
   @observable loadingText = ''
   @observable isPreviewOpen = false
@@ -44,6 +52,15 @@ class Store {
     this.lang = detectDefaultLang()
     this.theme = detectDefaultTheme()
     this.applyTheme(this.theme)
+
+    // keep "auto" in sync with the OS appearance while it's active
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        if (this.theme === 'auto') {
+          this.applyTheme('auto')
+        }
+      })
+    }
   }
 
   @action
@@ -103,10 +120,10 @@ class Store {
   }
 
   @action
-  applyTheme(theme: 'dark' | 'light') {
+  applyTheme(theme: ThemeMode) {
     if (typeof document !== 'undefined') {
       const root = document.documentElement
-      if (theme === 'light') {
+      if (resolveTheme(theme) === 'light') {
         root.classList.add('light-theme')
         root.classList.remove('dark-theme')
         root.setAttribute('data-bs-theme', 'light')
@@ -119,7 +136,7 @@ class Store {
   }
 
   @action
-  setTheme(theme: 'dark' | 'light') {
+  setTheme(theme: ThemeMode) {
     this.theme = theme
     this.applyTheme(theme)
     if (typeof window !== 'undefined') {
@@ -128,8 +145,9 @@ class Store {
   }
 
   @action
-  toggleTheme() {
-    this.setTheme(this.theme === 'dark' ? 'light' : 'dark')
+  cycleTheme() {
+    const next = THEME_CYCLE[(THEME_CYCLE.indexOf(this.theme) + 1) % THEME_CYCLE.length]
+    this.setTheme(next)
   }
 
   @action

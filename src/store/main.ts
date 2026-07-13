@@ -7,7 +7,6 @@ import Contents from 'store/contents'
 import storeBlobs, { Store as Blobs } from 'store/blobs'
 import JSZip from "jszip"
 
-import 'template/mimetype'
 import getTemplateContainerXml from 'template/container.xml'
 import getTemplatePageXhtml from 'template/page.xhtml'
 import getTemplatePageImgXhtml from 'template/page_img.xhtml'
@@ -62,6 +61,19 @@ class Store {
     } catch {
       // do nothing
     }
+  }
+
+  @action
+  resetWorkspace() {
+    this.book.reset()
+    this.contents.reset()
+    this.blobs.clear()
+    this.ui.selectPageIndex(null)
+    this.ui.firstImport = true
+    this.ui.fileName = ''
+    this.ui.modalBookVisible = false
+    this.ui.modalContentVisible = false
+    this.ui.modalPageVisible = false
   }
 
   @action
@@ -412,4 +424,5 @@ autorun(() => {
 })
 
 export const StoreContext = React.createContext(store);
+export const useStore = () => React.useContext(StoreContext);
 export default store;

@@ -88,6 +88,19 @@ class Store {
       }
     })
   }
+
+  @action
+  clear() {
+    Object.values(this.blobs).forEach(item => {
+      try {
+        URL.revokeObjectURL(item.blobURL)
+        URL.revokeObjectURL(item.thumbnailURL)
+      } catch {
+        // ignore
+      }
+    })
+    this.blobs = {}
+  }
 }
 
 export { Store }

@@ -101,6 +101,12 @@ class Store {
   }
 
   @action
+  reset() {
+    this.list = [{ pageIndex: 0, title: '表紙' }]
+    this.indexMap = { 0: 0 }
+  }
+
+  @action
   saveSet(title: string) {
     this.savedSets.push({
       title,

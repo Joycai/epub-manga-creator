@@ -132,6 +132,16 @@ class Store {
   }
 
   @action
+  reset() {
+    this.bookID = uuid()
+    this.bookTitle = ''
+    this.bookAuthors = ['']
+    this.bookSubject = ''
+    this.bookPublisher = ''
+    this.pages = []
+  }
+
+  @action
   applySet(index: number) {
     const selectedSet = this.savedSets[index];
     if (selectedSet) {

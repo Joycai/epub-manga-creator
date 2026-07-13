@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 EPUB Manga Creator V2 is a browser-based single-page app that packages manga/comic images into EPUB 3.0 (fixed-layout, Japanese manga format). The EPUB is generated entirely client-side — no backend.
 
 - **Homepage**: `https://wing-kai.github.io/epub-manga-creator/`
-- **Tech stack**: React 18, TypeScript, MobX, Vite, Bootstrap Dark 5
+- **Tech stack**: React 19, TypeScript, MobX, Vite, Bootstrap Dark 5
 
 ## Commands
 
