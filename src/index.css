@@ -502,7 +502,11 @@ html.dark-theme .btn-close { filter: invert(1) grayscale(1) brightness(1.6); }
 #main > .alert { width: 320px; margin: auto; }
 
 #main .row { width: 100%; }
-#main .row.page-row { margin: 0 0 22px 0; }
+/* Single wrapping container for all spreads — the browser decides how many fit
+   per line, so row-gap (not per-row margins) provides the vertical rhythm. */
+#main .row.page-row { margin: 0 0 22px 0; row-gap: 22px; }
+/* Japanese (right-to-left) reading order: each line fills from the right. */
+#main .row.page-row.page-row-rtl { flex-direction: row-reverse; }
 
 /* ---------- Page cards ------------------------------------ */
 

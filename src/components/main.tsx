@@ -1,5 +1,5 @@
 import { observer } from 'mobx-react'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import storeMain, { useStore } from 'store/main'
 import storeBlobs, { StoreBlobs } from 'store/blobs'
 import Icon from './icon'
@@ -141,19 +141,6 @@ const DoublePageCard = observer(function(props: {
   )
 })
 
-let CARD_BOX_WIDTH = 120;
-let CARD_BOX_MARGIN = 8;
-
-if (typeof window !== 'undefined') {
-  try {
-    const computedStyle = getComputedStyle(document.documentElement);
-    CARD_BOX_WIDTH = +computedStyle.getPropertyValue('--card-box-width').slice(0, -2) || 120;
-    CARD_BOX_MARGIN = +computedStyle.getPropertyValue('--card-box-margin').slice(0, -2) || 8;
-  } catch (e) {
-    // SSR Fallback
-  }
-}
-
 const RestoreBanner = observer(function() {
   const t = useI18n()
   const [hasBackup, setHasBackup] = useState(false)
@@ -206,87 +193,38 @@ const RestoreBanner = observer(function() {
   )
 })
 
+// Pair the pages into spreads. This is purely sequential and independent of the
+// viewport: how many spreads fit on a line is CSS's job (the container wraps).
+const buildSpreads = function(pageCount: number, coverPosition: 'first-page' | 'alone') {
+  const spreads: [number | null, number | null][] = []
+
+  if (pageCount === 0) {
+    return spreads
+  }
+
+  // 'first-page' gives the cover a spread of its own, so the first slot is empty.
+  let next = coverPosition === 'first-page' ? -1 : 0
+
+  while (next < pageCount) {
+    spreads.push([
+      next < 0 ? null : next,
+      next + 1 < pageCount ? next + 1 : null
+    ])
+    next += 2
+  }
+
+  return spreads
+}
+
 const Main = function() {
-  const mainRef = useRef<HTMLElement>(null)
   const { book: storeBook } = useStore()
-  const [showPages, setShowPages] = useState<[any, any][][]>([])
   const t = useI18n()
 
-  const pageResizeCallback = useCallback(() => {
-    const pageWidth = mainRef.current?.clientWidth
-    if (!pageWidth) {
-      return
-    }
-
-    // At least one spread per row, otherwise a very narrow window yields 0 and
-    // rowCount becomes Infinity below.
-    const boxCountInOneRow = Math.max(1, Math.floor(pageWidth / (CARD_BOX_WIDTH + CARD_BOX_MARGIN * 2)))
-    // 'first-page' keeps the cover alone in the first spread, which costs one extra slot.
-    const slotCount = storeBook.pages.length + (storeBook.coverPosition === 'first-page' ? 1 : 0)
-    const rowCount = Math.ceil(slotCount / boxCountInOneRow / 2)
-
-    // if (maxCardBoxCountInOneRow === boxCountInOneRow) {
-    //   return
-    // }
-
-    if (storeBook.pages.length === 0) {
-      // setMaxCardBoxCountInOneRow(boxCountInOneRow)
-      setShowPages([])
-      return
-    }
-
-    let i = 0
-    let j = 0
-    let x = -1
-
-    const pages: [any, any][][] = []
-    const len = storeBook.pages.length
-
-    while(i++ < rowCount) {
-      const r: [number | null, number | null][] = []
-      while(j++ < boxCountInOneRow) {
-        r.push([
-          storeBook.coverPosition === 'first-page'
-            ? x === -1 ? null : ++x < len ? x : null
-            : ++x < len ? x : null,
-          ++x < len ? x : null
-        ])
-      }
-      j = 0
-      pages.push(storeBook.pageDirection === 'right' ? r.reverse() : r)
-    }
-
-    // setMaxCardBoxCountInOneRow(boxCountInOneRow)
-    setShowPages(pages)
-  }, [storeBook.coverPosition, storeBook.pageDirection, storeBook.pages.length])
+  const spreads = buildSpreads(storeBook.pages.length, storeBook.coverPosition)
 
   const onClickImport = useCallback(() => {
     document.getElementById('input-upload')?.click()
   }, [])
-
-  useEffect(() => {
-    pageResizeCallback()
-  }, [storeBook.pages, pageResizeCallback])
-
-  useEffect(() => {
-    // rAF-throttled resize handler, cleaned up on unmount
-    let scheduled = false
-    const onResize = () => {
-      if (scheduled) {
-        return
-      }
-      scheduled = true
-      requestAnimationFrame(() => {
-        scheduled = false
-        pageResizeCallback()
-      })
-    }
-
-    window.addEventListener('resize', onResize)
-    return () => {
-      window.removeEventListener('resize', onResize)
-    }
-  }, [pageResizeCallback])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -319,21 +257,28 @@ const Main = function() {
   }, [storeBook.pages.length])
 
   return (
-    <main id="main" className="pt-4 pb-4" ref={mainRef}>
+    <main id="main" className="pt-4 pb-4">
       <RestoreBanner />
       {
-        showPages.length === 0 ? (
+        spreads.length === 0 ? (
           import.meta.env.DEV
             ? <div className="btn btn-secondary main-input-upload" onClick={onClickImport}>{t.main.import}</div>
             : <div className="alert alert-secondary text-center" role="alert">{t.main.ready}</div>
         ) : (
-          showPages.map((row, i) => (
-            <div key={i} className="row page-row justify-content-evenly">
-              {
-                row.map((pages, j) => (<DoublePageCard key={`${i}-${j}-${pages[0]}-${pages[1]}`} pages={pages}/>))
-              }
-            </div>
-          ))
+          // One wrapping container for every spread. Chunking into fixed-width rows
+          // in JS meant guessing the wrap point, and a wrong guess let the browser
+          // wrap a "row" again — that's the 8-then-2 interleaving. Right-to-left
+          // reading order is a CSS concern too (row-reverse), so it survives wrapping.
+          <div
+            className={
+              'row page-row justify-content-evenly'
+              + (storeBook.pageDirection === 'right' ? ' page-row-rtl' : '')
+            }
+          >
+            {
+              spreads.map((pages, i) => (<DoublePageCard key={`${i}-${pages[0]}-${pages[1]}`} pages={pages}/>))
+            }
+          </div>
         )
       }
       <div className="author-info">
