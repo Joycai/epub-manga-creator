@@ -10,6 +10,8 @@ const THIS_YEAR = (new Date()).getFullYear()
 
 const PageCard = observer(function(props: {
   pageItemIndex: number | null
+  // Number shown on the card. Display only — never use it to address storeBook.pages.
+  pageNumber?: number | null
   blobItem?: StoreBlobs.ImageBlob | null
   pagePosition: 'center' | 'left' | 'right'
   blank: boolean
@@ -98,7 +100,7 @@ const PageCard = observer(function(props: {
       {
         props.pageItemIndex === null
           ? null
-          : <div className="page-num">{props.pageItemIndex + 1}</div>
+          : <div className="page-num">{(props.pageNumber ?? props.pageItemIndex) + 1}</div>
       }
     </div>
   )
@@ -113,19 +115,24 @@ const DoublePageCard = observer(function(props: {
   const rightSidePageIndex = storeBook.pageDirection === 'right' ? props.pages[0] : props.pages[1]
   const leftSidePage = leftSidePageIndex === null ? null : storeBook.pages[leftSidePageIndex]
   const rightSidePage = rightSidePageIndex === null ? null : storeBook.pages[rightSidePageIndex]
-  const coverPosition = storeBook.coverPosition === 'alone' ? 1 : 0
+  // With a standalone cover, page 0 is the cover and the body is numbered from 1.
+  // This offset shifts the *label* only — pageItemIndex must stay the real index in
+  // storeBook.pages, since selection / preview / remove / TOC all address pages by it.
+  const pageNumberOffset = storeBook.coverPosition === 'alone' ? -1 : 0
 
   return (
     <div className="card-group">
       <PageCard
-        pageItemIndex={leftSidePageIndex === null ? null : (leftSidePageIndex - coverPosition)}
+        pageItemIndex={leftSidePageIndex}
+        pageNumber={leftSidePageIndex === null ? null : (leftSidePageIndex + pageNumberOffset)}
         blobItem={leftSidePage ? storeBlobs.blobs[leftSidePage.blobID] : null}
         pagePosition={storeBook.pagePosition === 'between' ? 'left' : 'center'}
         blank={leftSidePage?.blank || false}
       />
       <div className="book-spine" />
       <PageCard
-        pageItemIndex={rightSidePageIndex === null ? null : (rightSidePageIndex - coverPosition)}
+        pageItemIndex={rightSidePageIndex}
+        pageNumber={rightSidePageIndex === null ? null : (rightSidePageIndex + pageNumberOffset)}
         blobItem={rightSidePage ? storeBlobs.blobs[rightSidePage.blobID] : null}
         pagePosition={storeBook.pagePosition === 'between' ? 'right' : 'center'}
         blank={rightSidePage?.blank || false}
@@ -211,8 +218,12 @@ const Main = function() {
       return
     }
 
-    const boxCountInOneRow = Math.floor(pageWidth / (CARD_BOX_WIDTH + CARD_BOX_MARGIN * 2))
-    const rowCount = Math.ceil((1 + storeBook.pages.length) / boxCountInOneRow / 2)
+    // At least one spread per row, otherwise a very narrow window yields 0 and
+    // rowCount becomes Infinity below.
+    const boxCountInOneRow = Math.max(1, Math.floor(pageWidth / (CARD_BOX_WIDTH + CARD_BOX_MARGIN * 2)))
+    // 'first-page' keeps the cover alone in the first spread, which costs one extra slot.
+    const slotCount = storeBook.pages.length + (storeBook.coverPosition === 'first-page' ? 1 : 0)
+    const rowCount = Math.ceil(slotCount / boxCountInOneRow / 2)
 
     // if (maxCardBoxCountInOneRow === boxCountInOneRow) {
     //   return
