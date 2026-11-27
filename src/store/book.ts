@@ -1,11 +1,12 @@
 import { makeAutoObservable, toJS } from "mobx"
 import uuid from 'utils/get-uuid'
+import type { PageSticky } from 'utils/epub'
 
 export declare namespace StoreBook {
   export interface PageItem {
     index: number,
     blobID: string
-    sticky: 'auto' | 'left' | 'right',
+    sticky: PageSticky,
     blank: boolean
   }
 
@@ -14,10 +15,11 @@ export declare namespace StoreBook {
     bookAuthors: string[]
     bookSubject: string
     bookPublisher: string
+    bookLanguage?: string
   }
 }
 
-type BookPageProperty = 'bookID' | 'bookTitle' | 'bookAuthors' | 'bookSubject' | 'bookPublisher' | 'pageSize' | 'pagePosition' | 'pageShow' | 'pageFit' | 'pageBackgroundColor' | 'pageDirection' | 'coverPosition' | 'imgTag'
+type BookPageProperty = 'bookID' | 'bookTitle' | 'bookAuthors' | 'bookSubject' | 'bookPublisher' | 'bookLanguage' | 'pageSize' | 'pagePosition' | 'pageShow' | 'pageFit' | 'pageBackgroundColor' | 'pageDirection' | 'coverPosition' | 'imgTag'
 
 class Store {
   bookID: string = uuid()
@@ -25,8 +27,10 @@ class Store {
   bookAuthors: string[] = ['']
   bookSubject: string = ''
   bookPublisher: string = ''
+  bookLanguage: string = 'ja'
 
-  pageSize: [number, number] = [250, 353]
+  pageSize: [number, number] = [880, 1250]
+  hasCustomPageSize: boolean = false
   pagePosition: ('center' | 'between') = 'between'
   pageShow: ('two' | 'one') = 'two'
   pageFit: ('stretch' | 'fit' | 'fill') = 'stretch'
@@ -43,8 +47,9 @@ class Store {
   }
 
   pushNewPage(blobUUIDs: string[]) {
+    const startIndex = this.pages.length
     const newPages: StoreBook.PageItem[] = blobUUIDs.map((uuid, index) => ({
-      index,
+      index: startIndex + index,
       blobID: uuid,
       sticky: 'auto',
       blank: false
@@ -71,6 +76,15 @@ class Store {
 
   updateBookPageProperty<K extends BookPageProperty>(key: K, value: Store[K]) {
     (this as any)[key] = value
+    if (key === 'pageSize') {
+      this.hasCustomPageSize = true
+    }
+  }
+
+  setPageSticky(index: number, sticky: StoreBook.PageItem['sticky']) {
+    if (this.pages[index]) {
+      this.pages[index].sticky = sticky
+    }
   }
 
   removePage(index: number) {
@@ -108,11 +122,12 @@ class Store {
   }
 
   saveBookInfoToSet() {
-    const newSet = {
+    const newSet: StoreBook.BookInfoSet = {
       bookTitle: this.bookTitle,
       bookAuthors: toJS(this.bookAuthors), // Keep toJS here for deep copy
       bookSubject: this.bookSubject,
       bookPublisher: this.bookPublisher,
+      bookLanguage: this.bookLanguage,
     }
 
     this.savedSets.push(newSet)
@@ -128,6 +143,8 @@ class Store {
     this.bookAuthors = ['']
     this.bookSubject = ''
     this.bookPublisher = ''
+    this.bookLanguage = 'ja'
+    this.hasCustomPageSize = false
     this.pages = []
   }
 
@@ -138,6 +155,7 @@ class Store {
       this.bookAuthors = toJS(selectedSet.bookAuthors) // Keep toJS here to avoid assigning observable to observable
       this.bookSubject = selectedSet.bookSubject
       this.bookPublisher = selectedSet.bookPublisher
+      this.bookLanguage = selectedSet.bookLanguage || 'ja'
     }
   }
 }

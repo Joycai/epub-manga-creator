@@ -61,6 +61,7 @@ const en = {
     author: 'Author',
     subject: 'Subject',
     publisher: 'Publisher',
+    language: 'Language',
     saveSet: 'Save set',
     removeSet: 'Remove set',
     analyze: 'Auto-fill',
@@ -87,9 +88,11 @@ const en = {
     position: 'Position',
     show: 'Show',
     fit: 'Fit',
+    background: 'Background',
     direction: 'Direction',
     cover: 'Cover',
     imageTag: 'Image tag',
+    spreadPosition: 'Spread slot',
   },
 
   // Option labels (shared)
@@ -101,10 +104,16 @@ const en = {
     stretch: 'Stretch',
     fit: 'Fit',
     fill: 'Fill',
+    white: 'White',
+    black: 'Black',
     rightJP: 'Right (Japanese)',
     left: 'Left',
     firstPage: 'First page',
     alone: 'Alone',
+    auto: 'Auto',
+    spreadCenter: 'Center (full)',
+    spreadLeft: 'Left page',
+    spreadRight: 'Right page',
   },
 
   // Language switcher

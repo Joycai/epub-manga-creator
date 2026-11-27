@@ -55,6 +55,7 @@ const zh: Locale = {
     author: '作者',
     subject: '主题',
     publisher: '出版商',
+    language: '语言',
     saveSet: '保存预设',
     removeSet: '删除预设',
     analyze: '自动填写',
@@ -79,9 +80,11 @@ const zh: Locale = {
     position: '对齐方式',
     show: '显示模式',
     fit: '适配模式',
+    background: '背景色',
     direction: '阅读方向',
     cover: '封面',
     imageTag: '图片标签',
+    spreadPosition: '跨页位置',
   },
 
   option: {
@@ -92,10 +95,16 @@ const zh: Locale = {
     stretch: '拉伸',
     fit: '适应',
     fill: '填充',
+    white: '白色',
+    black: '黑色',
     rightJP: '右翻（日式）',
     left: '左翻',
     firstPage: '首页',
     alone: '独立封面',
+    auto: '自动',
+    spreadCenter: '居中（跨页）',
+    spreadLeft: '固定左页',
+    spreadRight: '固定右页',
   },
 
   lang: {

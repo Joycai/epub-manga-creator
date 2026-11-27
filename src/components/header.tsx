@@ -4,6 +4,7 @@ import React, { useCallback, useContext, useLayoutEffect, useRef, useState } fro
 import Icon from 'components/icon'
 import { StoreContext } from 'store/main'
 import { useI18n } from 'i18n'
+import { detectImageMimeFromBytes, PageSticky } from 'utils/epub'
 
 type SupportType = 'image' | 'zip'
 
@@ -44,6 +45,11 @@ const PageControl = observer(function(props: { pageIndex: number | null }) {
     storeMain.splitPage(props.pageIndex as number)
   }, [props.pageIndex, storeMain])
 
+  const onSetPageSticky = useCallback((e: React.MouseEvent<HTMLSpanElement>) => {
+    const sticky = e.currentTarget.dataset.sticky as PageSticky
+    storeMain.book.setPageSticky(props.pageIndex as number, sticky)
+  }, [props.pageIndex, storeMain])
+
   const onRemovePage = useCallback(() => {
     const res = window.confirm(t.prompt.removePage(props.pageIndex as number))
     res && storeMain.removePage(props.pageIndex as number)
@@ -62,6 +68,9 @@ const PageControl = observer(function(props: { pageIndex: number | null }) {
           <button type="button" className="btn btn-outline-secondary disabled" disabled><Icon name="bookmark"/></button>
         </div>
         <div className="nav-item">
+          <button type="button" className="btn btn-outline-secondary disabled" disabled title={t.page.spreadPosition}><Icon name="swap"/></button>
+        </div>
+        <div className="nav-item">
           <button type="button" className="btn btn-outline-secondary disabled" disabled><Icon name="scissors"/></button>
         </div>
         <div className="nav-item">
@@ -71,7 +80,16 @@ const PageControl = observer(function(props: { pageIndex: number | null }) {
     )
   }
 
-  const blankPage = storeMain.book.pages[props.pageIndex].blank
+  const currentPage = storeMain.book.pages[props.pageIndex]
+  const blankPage = currentPage.blank
+  const currentSticky = currentPage.sticky
+  const isStandaloneCover = props.pageIndex === 0 && storeMain.book.coverPosition === 'alone' && storeMain.book.pages.length > 1
+  const stickyOptions: { value: PageSticky; label: string }[] = [
+    { value: 'auto', label: t.option.auto },
+    { value: 'center', label: t.option.spreadCenter },
+    { value: 'left', label: t.option.spreadLeft },
+    { value: 'right', label: t.option.spreadRight },
+  ]
 
   return (
     <>
@@ -103,6 +121,32 @@ const PageControl = observer(function(props: { pageIndex: number | null }) {
           }
         </ul>
       </div>
+      {
+        isStandaloneCover ? (
+          <div className="nav-item">
+            <button type="button" className="btn btn-outline-secondary disabled" disabled title={t.page.spreadPosition}><Icon name="swap"/></button>
+          </div>
+        ) : (
+          <div className="nav-item dropdown">
+            <button type="button" className="btn btn-secondary" title={t.page.spreadPosition}><Icon name="swap"/></button>
+            <ul className="dropdown-menu" style={{top: 0,left:'100%'}}>
+              {
+                stickyOptions.map((opt) =>
+                  <li key={opt.value}>
+                    <span
+                      className={"dropdown-item" + (currentSticky === opt.value ? ' active' : '')}
+                      data-sticky={opt.value}
+                      onClick={onSetPageSticky}
+                    >
+                      {opt.label}
+                    </span>
+                  </li>
+                )
+              }
+            </ul>
+          </div>
+        )
+      }
       <div className="nav-item">
         <button type="button" className="btn btn-secondary" disabled={blankPage} onClick={onSplitPage}>
           <Icon name="scissors"/>
@@ -118,7 +162,7 @@ const PageControl = observer(function(props: { pageIndex: number | null }) {
 })
 
 const AcceptMap = {
-  image: 'image/jpeg,image/png,image/webp,image/avif,.jpg,.jpeg,.png,.webp,.avif',
+  image: 'image/jpeg,image/png,image/gif,image/webp,image/avif,.jpg,.jpeg,.png,.gif,.webp,.avif',
   zip: 'application/zip,.zip',
 }
 
@@ -178,23 +222,7 @@ const Header = function() {
 
           return new Promise(resolve => {
             zipItem.async('uint8array').then(uint8Array => {
-              const bytes = new Uint8Array(uint8Array)
-              const hexOf = (start: number, end: number) =>
-                Array.from(bytes.subarray(start, end)).map(b => b.toString(16).padStart(2, '0')).join('')
-              const asciiOf = (start: number, end: number) =>
-                String.fromCharCode(...Array.from(bytes.subarray(start, end)))
-
-              let mimeType: string | null = null
-
-              if (hexOf(0, 4) === '89504e47') {
-                mimeType = 'image/png'
-              } else if (hexOf(0, 3) === 'ffd8ff') { // any JPEG marker (E0-EF, DB, EE...)
-                mimeType = 'image/jpeg'
-              } else if (asciiOf(0, 4) === 'RIFF' && asciiOf(8, 12) === 'WEBP') {
-                mimeType = 'image/webp'
-              } else if (asciiOf(4, 8) === 'ftyp' && ['avif', 'avis'].includes(asciiOf(8, 12))) {
-                mimeType = 'image/avif'
-              }
+              const mimeType = detectImageMimeFromBytes(new Uint8Array(uint8Array))
 
               if (mimeType) {
                 const b = new Blob([new Uint8Array(uint8Array)], { type: mimeType })
