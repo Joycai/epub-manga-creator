@@ -55,14 +55,18 @@ class Store {
     this.contents = new Contents()
     this.blobs = storeBlobs
 
-    makeAutoObservable(this)
+    makeAutoObservable(this, {
+      savedBlobIDs: false,
+    })
 
     try {
       const bookSets = JSON.parse(localStorage.getItem('EPUB_CREATOR_SAVED_SETS_BOOK') || '[]')
       const contentSets = JSON.parse(localStorage.getItem('EPUB_CREATOR_SAVED_SETS_CONTENTS') || '[]')
 
-      this.book.savedSets = bookSets
-      this.contents.savedSets = contentSets
+      runInAction(() => {
+        this.book.savedSets = bookSets
+        this.contents.savedSets = contentSets
+      })
     } catch {
       // do nothing
     }

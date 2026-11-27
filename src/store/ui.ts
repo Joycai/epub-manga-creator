@@ -48,9 +48,9 @@ class Store {
   firstImport = true
 
   constructor() {
-    makeAutoObservable(this)
     this.lang = detectDefaultLang()
     this.theme = detectDefaultTheme()
+    makeAutoObservable(this)
     this.applyTheme(this.theme)
 
     // keep "auto" in sync with the OS appearance while it's active
