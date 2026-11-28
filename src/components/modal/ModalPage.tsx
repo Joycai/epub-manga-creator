@@ -75,6 +75,9 @@ const ModalPage = observer(function() {
   const onChangePageFit = useCallback((value: 'stretch' | 'fit' | 'fill') => {
     storeBook.updateBookPageProperty('pageFit', value);
   }, [storeBook]);
+  const onChangePageBackgroundColor = useCallback((value: 'white' | 'black') => {
+    storeBook.updateBookPageProperty('pageBackgroundColor', value);
+  }, [storeBook]);
   const onChangePageDirection = useCallback((value: 'right' | 'left') => {
     storeBook.updateBookPageProperty('pageDirection', value);
   }, [storeBook]);
@@ -162,6 +165,13 @@ const ModalPage = observer(function() {
               <ButtonRadio current={storeBook.pageFit} value="stretch" label={t.option.stretch} onClick={onChangePageFit} />
               <ButtonRadio current={storeBook.pageFit} value="fit" label={t.option.fit} onClick={onChangePageFit} />
               <ButtonRadio current={storeBook.pageFit} value="fill" label={t.option.fill} onClick={onChangePageFit} />
+            </div>
+          </div>
+          <div className="mb-2 row">
+            <label className="col-3 col-form-label text-end">{t.page.background}</label>
+            <div className="col-9 d-flex align-items-center">
+              <ButtonRadio current={storeBook.pageBackgroundColor} value="white" label={t.option.white} onClick={onChangePageBackgroundColor} />
+              <ButtonRadio current={storeBook.pageBackgroundColor} value="black" label={t.option.black} onClick={onChangePageBackgroundColor} />
             </div>
           </div>
           <div className="mb-2 row">

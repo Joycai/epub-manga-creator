@@ -3,7 +3,8 @@ const getText = (): string => `<?xml version="1.0" encoding="UTF-8"?>
 <html
  xmlns="http://www.w3.org/1999/xhtml"
  xmlns:epub="http://www.idpf.org/2007/ops"
- xml:lang="ja"
+ lang="{{lang}}"
+ xml:lang="{{lang}}"
 >
 <head>
 <meta charset="UTF-8" />
@@ -14,7 +15,7 @@ const getText = (): string => `<?xml version="1.0" encoding="UTF-8"?>
 </head>
 <body>
 <div class="main">
-<img src="{{imageSource}}" style="{{style}}"/>
+{{body}}
 </div>
 </body>
 </html>`

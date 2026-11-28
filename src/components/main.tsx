@@ -5,16 +5,24 @@ import storeBlobs, { StoreBlobs } from 'store/blobs'
 import Icon from './icon'
 import { useI18n } from 'i18n'
 import { db } from 'utils/db'
+import { computePageSlots, getSvgPreserveAspectRatio, PageSticky } from 'utils/epub'
 
 const THIS_YEAR = (new Date()).getFullYear()
+
+const STICKY_BADGE_MAP: Partial<Record<PageSticky, string>> = {
+  center: 'C',
+  left: 'L',
+  right: 'R',
+}
 
 const PageCard = observer(function(props: {
   pageItemIndex: number | null
   // Number shown on the card. Display only — never use it to address storeBook.pages.
   pageNumber?: number | null
   blobItem?: StoreBlobs.ImageBlob | null
-  pagePosition: 'center' | 'left' | 'right'
+  align: 'center' | 'left' | 'right'
   blank: boolean
+  sticky?: PageSticky
 }) {
   const { ui: storeUI, book: storeBook, contents: storeContent } = useStore()
   const t = useI18n()
@@ -29,22 +37,8 @@ const PageCard = observer(function(props: {
     )
   }
 
-  let preserveAspectRatio = 'none'
-
-  if (storeBook.pageFit !== 'stretch') {
-    preserveAspectRatio = props.pagePosition === 'center'
-      ? 'xMidYMid '
-      : props.pagePosition === 'left'
-        ? 'xMinYMid '
-        : 'xMaxYMid '
-
-    if (storeBook.pageFit === 'fit') {
-      preserveAspectRatio += 'meet'
-    } else { // props.imageFit === 'fill'
-      preserveAspectRatio += 'slice'
-    }
-  }
-
+  const preserveAspectRatio = getSvgPreserveAspectRatio(storeBook.pageFit, props.align)
+  const stickyBadge = props.sticky ? STICKY_BADGE_MAP[props.sticky] : undefined
   const imageFocus = props.pageItemIndex !== null && (storeUI.selectedPageIndex === props.pageItemIndex)
 
   return (
@@ -53,6 +47,9 @@ const PageCard = observer(function(props: {
         props.pageItemIndex in storeContent.indexMap
           ? <div className="bookmark-ribbon" title={storeContent.list[storeContent.indexMap[props.pageItemIndex]].title} />
           : null
+      }
+      {
+        stickyBadge ? <div className="spread-badge">{stickyBadge}</div> : null
       }
       {
         props.pageItemIndex !== null && (props.blobItem || props.blank) && (
@@ -106,19 +103,42 @@ const PageCard = observer(function(props: {
   )
 })
 
+interface SpreadItem {
+  left: number | null
+  right: number | null
+  center: number | null
+}
+
 const DoublePageCard = observer(function(props: {
-  pages: [number | null, number | null]
+  spread: SpreadItem
 }) {
   const { book: storeBook } = useStore()
-
-  const leftSidePageIndex = storeBook.pageDirection === 'right' ? props.pages[1] : props.pages[0]
-  const rightSidePageIndex = storeBook.pageDirection === 'right' ? props.pages[0] : props.pages[1]
-  const leftSidePage = leftSidePageIndex === null ? null : storeBook.pages[leftSidePageIndex]
-  const rightSidePage = rightSidePageIndex === null ? null : storeBook.pages[rightSidePageIndex]
+  const { left: leftSidePageIndex, right: rightSidePageIndex, center: centerPageIndex } = props.spread
   // With a standalone cover, page 0 is the cover and the body is numbered from 1.
   // This offset shifts the *label* only — pageItemIndex must stay the real index in
   // storeBook.pages, since selection / preview / remove / TOC all address pages by it.
-  const pageNumberOffset = storeBook.coverPosition === 'alone' ? -1 : 0
+  const isStandaloneCover = storeBook.coverPosition === 'alone' && storeBook.pages.length > 1
+  const pageNumberOffset = isStandaloneCover ? -1 : 0
+  const useBetweenAlign = storeBook.pageShow === 'two' && storeBook.pagePosition === 'between'
+
+  if (centerPageIndex !== null) {
+    const centerPage = storeBook.pages[centerPageIndex]
+    return (
+      <div className="card-group card-group-center">
+        <PageCard
+          pageItemIndex={centerPageIndex}
+          pageNumber={centerPageIndex + pageNumberOffset}
+          blobItem={centerPage ? storeBlobs.blobs[centerPage.blobID] : null}
+          align="center"
+          blank={centerPage?.blank || false}
+          sticky={centerPageIndex === 0 && isStandaloneCover ? undefined : centerPage?.sticky}
+        />
+      </div>
+    )
+  }
+
+  const leftSidePage = leftSidePageIndex === null ? null : storeBook.pages[leftSidePageIndex]
+  const rightSidePage = rightSidePageIndex === null ? null : storeBook.pages[rightSidePageIndex]
 
   return (
     <div className="card-group">
@@ -126,16 +146,18 @@ const DoublePageCard = observer(function(props: {
         pageItemIndex={leftSidePageIndex}
         pageNumber={leftSidePageIndex === null ? null : (leftSidePageIndex + pageNumberOffset)}
         blobItem={leftSidePage ? storeBlobs.blobs[leftSidePage.blobID] : null}
-        pagePosition={storeBook.pagePosition === 'between' ? 'left' : 'center'}
+        align={useBetweenAlign ? 'right' : 'center'}
         blank={leftSidePage?.blank || false}
+        sticky={leftSidePageIndex === 0 && isStandaloneCover ? undefined : leftSidePage?.sticky}
       />
       <div className="book-spine" />
       <PageCard
         pageItemIndex={rightSidePageIndex}
         pageNumber={rightSidePageIndex === null ? null : (rightSidePageIndex + pageNumberOffset)}
         blobItem={rightSidePage ? storeBlobs.blobs[rightSidePage.blobID] : null}
-        pagePosition={storeBook.pagePosition === 'between' ? 'right' : 'center'}
+        align={useBetweenAlign ? 'left' : 'center'}
         blank={rightSidePage?.blank || false}
+        sticky={rightSidePageIndex === 0 && isStandaloneCover ? undefined : rightSidePage?.sticky}
       />
     </div>
   )
@@ -193,26 +215,57 @@ const RestoreBanner = observer(function() {
   )
 })
 
-// Pair the pages into spreads. This is purely sequential and independent of the
-// viewport: how many spreads fit on a line is CSS's job (the container wraps).
-const buildSpreads = function(pageCount: number, coverPosition: 'first-page' | 'alone') {
-  const spreads: [number | null, number | null][] = []
-
-  if (pageCount === 0) {
+// Pair pages into visual spreads matching computePageSlots and reading direction.
+const buildSpreads = function(
+  pages: { sticky?: PageSticky }[],
+  coverPosition: 'first-page' | 'alone',
+  pageDirection: 'right' | 'left',
+): SpreadItem[] {
+  const spreads: SpreadItem[] = []
+  if (pages.length === 0) {
     return spreads
   }
 
-  // 'first-page' gives the cover a spread of its own, so the first slot is empty.
-  let next = coverPosition === 'first-page' ? -1 : 0
+  const slots = computePageSlots(pages, coverPosition, pageDirection)
+  const firstSlot: 'left' | 'right' = pageDirection === 'right' ? 'right' : 'left'
+  const secondSlot: 'left' | 'right' = firstSlot === 'right' ? 'left' : 'right'
 
-  while (next < pageCount) {
-    spreads.push([
-      next < 0 ? null : next,
-      next + 1 < pageCount ? next + 1 : null
-    ])
-    next += 2
+  let pending: { left: number | null; right: number | null } | null = null
+  const flushPending = () => {
+    if (pending) {
+      spreads.push({ left: pending.left, right: pending.right, center: null })
+      pending = null
+    }
   }
 
+  for (let i = 0; i < slots.length; i++) {
+    const slot = slots[i]
+
+    if (slot === 'none') {
+      // Standalone cover is shown in the first preview spread alongside page 1.
+      pending = { left: null, right: null }
+      pending[firstSlot] = i
+    } else if (slot === 'center') {
+      flushPending()
+      spreads.push({ left: null, right: null, center: i })
+    } else if (slot === firstSlot) {
+      flushPending()
+      pending = { left: null, right: null }
+      pending[firstSlot] = i
+    } else if (pending && pending[secondSlot] === null) {
+      pending[secondSlot] = i
+      flushPending()
+    } else {
+      flushPending()
+      spreads.push({
+        left: slot === 'left' ? i : null,
+        right: slot === 'right' ? i : null,
+        center: null,
+      })
+    }
+  }
+
+  flushPending()
   return spreads
 }
 
@@ -220,7 +273,7 @@ const Main = function() {
   const { book: storeBook } = useStore()
   const t = useI18n()
 
-  const spreads = buildSpreads(storeBook.pages.length, storeBook.coverPosition)
+  const spreads = buildSpreads(storeBook.pages, storeBook.coverPosition, storeBook.pageDirection)
 
   const onClickImport = useCallback(() => {
     document.getElementById('input-upload')?.click()
@@ -276,7 +329,7 @@ const Main = function() {
             }
           >
             {
-              spreads.map((pages, i) => (<DoublePageCard key={`${i}-${pages[0]}-${pages[1]}`} pages={pages}/>))
+              spreads.map((spread, i) => (<DoublePageCard key={`${i}-${spread.left}-${spread.right}-${spread.center}`} spread={spread}/>))
             }
           </div>
         )

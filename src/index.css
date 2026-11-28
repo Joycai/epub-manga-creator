@@ -520,6 +520,14 @@ html.dark-theme .btn-close { filter: invert(1) grayscale(1) brightness(1.6); }
   align-items: stretch;
 }
 
+#main .card-group.card-group-center {
+  justify-content: center;
+}
+
+#main .card-group.card-group-center .card {
+  flex: 0 0 calc((var(--card-box-width) - 2px) / 2);
+}
+
 #main .card {
   overflow: hidden;
   height: 200px;
@@ -566,6 +574,25 @@ html.dark-theme .btn-close { filter: invert(1) grayscale(1) brightness(1.6); }
   background: var(--accent);
   box-shadow: var(--shadow-soft);
   clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%);
+}
+
+/* manual spread-slot override badge (C / L / R) */
+#main .card .spread-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  z-index: 3;
+  min-width: 22px;
+  padding: 2px 6px;
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.3;
+  border-radius: 999px;
+  box-shadow: var(--shadow-soft);
+  pointer-events: none;
 }
 
 /* zoom / preview button */

@@ -1,7 +1,8 @@
 const getText = (): string => `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="ja">
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="{{lang}}" xml:lang="{{lang}}">
 <head>
-<meta charset="UTF-8"></meta>
+<meta charset="UTF-8" />
 <title>Navigation</title>
 </head>
 <body>
@@ -11,9 +12,10 @@ const getText = (): string => `<?xml version="1.0" encoding="UTF-8"?>
 <!-- navigation-list -->
 </ol>
 </nav>
-<nav epub:type="landmarks">
+<nav epub:type="landmarks" id="landmarks" hidden="hidden">
+<h2>Landmarks</h2>
 <ol>
-<li><a epub:type="bodymatter" href="text/{{startPage}}">Start of Content</a></li>
+<!-- landmarks-list -->
 </ol>
 </nav>
 </body>

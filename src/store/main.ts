@@ -4,39 +4,62 @@ import uuid from 'utils/get-uuid'
 import Book, { StoreBook } from 'store/book'
 import Ui from 'store/ui'
 import Contents from 'store/contents'
-import storeBlobs, { Store as Blobs } from 'store/blobs'
+import storeBlobs, { Store as Blobs, StoreBlobs } from 'store/blobs'
 import { db } from 'utils/db'
 import { getLocale } from 'i18n'
-import JSZip from "jszip"
+import {
+  buildEpubZip,
+  detectImageMimeFromBytes,
+  EpubPageInput,
+  isEpub33CoreImageMime,
+} from 'utils/epub'
 
-import getTemplateContainerXml from 'template/container.xml'
-import getTemplatePageXhtml from 'template/page.xhtml'
-import getTemplatePageImgXhtml from 'template/page_img.xhtml'
-import getTemplateFixedLayoutJpCss from 'template/fixed-layout-jp.css'
-import getTemplateStandardOpf from 'template/standard.opf'
-import getTemplateNavigationDocumentsXhtml from 'template/navigation-documents.xhtml'
+const canvasToBlob = (
+  canvas: HTMLCanvasElement,
+  type: string,
+  quality?: number,
+): Promise<Blob | null> =>
+  new Promise(resolve => canvas.toBlob(blob => resolve(blob), type, quality))
 
-const htmlToEscape = (str: string): string => {
-  // strip control chars that are invalid in XML 1.0 even when escaped
-  // eslint-disable-next-line no-control-regex
-  const cleaned = str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-  const reg = /"|&|'|<|>|\\|[\x80-\xFF]|[\u0100-\u2700]/g
+const ensureCoreMediaImage = async (
+  blobItem: StoreBlobs.ImageBlob,
+): Promise<{ data: Blob; mimeType: string }> => {
+  const header = new Uint8Array(await blobItem.blob.slice(0, 16).arrayBuffer())
+  const sniffed = detectImageMimeFromBytes(header)
+  const mimeType = sniffed || (blobItem.blob.type || '').toLowerCase()
 
-  return cleaned.replace(reg, ($0) => '&#' + $0.charCodeAt(0) + ';')
-}
-
-// Safe template interpolation: a plain-string replacement would interpret
-// `$&`, `$'` etc. in user content as special replacement patterns.
-const fillTemplate = (template: string, pattern: string | RegExp, value: string): string =>
-  template.replace(pattern, () => value)
-
-const getNumberStr = (num: number, zeroCount: number): string => {
-  let str = String(num)
-  let i = zeroCount - str.length
-  while (i-- > 0) {
-    str = '0' + str
+  if (mimeType && isEpub33CoreImageMime(mimeType)) {
+    return { data: blobItem.blob, mimeType }
   }
-  return str
+
+  // Transcode foreign image formats (e.g. AVIF) to an EPUB 3.3 Core Media Type.
+  const img = blobItem.originImage
+  const canvas = document.createElement('canvas')
+  try {
+    canvas.width = img.naturalWidth || img.width
+    canvas.height = img.naturalHeight || img.height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) {
+      throw new Error('Failed to create 2D canvas context for image transcoding')
+    }
+    ctx.drawImage(img, 0, 0)
+
+    let converted = await canvasToBlob(canvas, 'image/webp', 0.92)
+    if (!converted || !isEpub33CoreImageMime(converted.type)) {
+      converted = await canvasToBlob(canvas, 'image/png')
+    }
+    if (!converted) {
+      throw new Error(`Failed to transcode image (${mimeType || 'unknown'}) to an EPUB 3.3 Core Media Type`)
+    }
+
+    return {
+      data: converted,
+      mimeType: isEpub33CoreImageMime(converted.type) ? converted.type : 'image/png',
+    }
+  } finally {
+    canvas.width = 0
+    canvas.height = 0
+  }
 }
 
 class Store {
@@ -116,7 +139,7 @@ class Store {
       const available = new Set(blobIDs)
       this.book.pages = (backup.pages as StoreBook.PageItem[])
         .filter(page => page.blank || available.has(page.blobID))
-        .map((page, i) => ({ ...page, index: i }))
+        .map((page, i) => ({ ...page, sticky: page.sticky || 'auto', index: i }))
 
       if (backup.bookInfo) {
         this.book.bookID = backup.bookInfo.bookID || this.book.bookID
@@ -124,11 +147,15 @@ class Store {
         this.book.bookAuthors = backup.bookInfo.bookAuthors?.length ? backup.bookInfo.bookAuthors : ['']
         this.book.bookSubject = backup.bookInfo.bookSubject || ''
         this.book.bookPublisher = backup.bookInfo.bookPublisher || ''
+        this.book.bookLanguage = backup.bookInfo.bookLanguage || 'ja'
       }
 
       if (backup.pageSettings) {
         const s = backup.pageSettings
-        if (Array.isArray(s.pageSize)) this.book.pageSize = s.pageSize
+        if (Array.isArray(s.pageSize)) {
+          this.book.pageSize = s.pageSize
+          this.book.hasCustomPageSize = true
+        }
         if (s.pagePosition) this.book.pagePosition = s.pagePosition
         if (s.pageShow) this.book.pageShow = s.pageShow
         if (s.pageFit) this.book.pageFit = s.pageFit
@@ -147,11 +174,26 @@ class Store {
     })
   }
 
-  importPageFromImages(fileList: File[]) {
+  async importPageFromImages(fileList: File[]) {
     const uuids = fileList.map(() => uuid())
 
     this.book.pushNewPage(uuids)
-    this.blobs.push(fileList, uuids)
+    await this.blobs.push(fileList, uuids)
+
+    if (!this.book.hasCustomPageSize && uuids.length > 0) {
+      const firstBlob = this.blobs.blobs[uuids[0]]
+      const img = firstBlob?.originImage
+      const width = img ? (img.naturalWidth || img.width) : 0
+      const height = img ? (img.naturalHeight || img.height) : 0
+      if (width > 0 && height > 0) {
+        runInAction(() => {
+          if (!this.book.hasCustomPageSize) {
+            this.book.pageSize = [width, height]
+            this.book.hasCustomPageSize = true
+          }
+        })
+      }
+    }
   }
 
   replacePageIndex(index: number, targetIndex: number) {
@@ -291,222 +333,53 @@ class Store {
   }
 
   private async buildAndDownloadBook() {
-    let templateContainerXml = getTemplateContainerXml()
-    let templatePageXhtml = getTemplatePageXhtml()
-    let templatePageImgXhtml = getTemplatePageImgXhtml()
-    let templateFixedLayoutJpCss = getTemplateFixedLayoutJpCss()
-    let templateStandardOpf = getTemplateStandardOpf()
-    let templateNavigationDocumentsXhtml = getTemplateNavigationDocumentsXhtml()
-
-    const coverAlone = this.book.coverPosition === 'alone'
-    const Zip = new JSZip()
-
-    // The EPUB spec requires `mimetype` to be the FIRST entry in the archive,
-    // stored without compression.
-    Zip.file('mimetype', 'application/epub+zip', { compression: 'STORE' })
-
-    // In "alone" mode the cover is not part of the reading order, so content
-    // page indices are shifted by one relative to book.pages.
-    templateNavigationDocumentsXhtml = fillTemplate(
-      templateNavigationDocumentsXhtml,
-      '{{startPage}}',
-      coverAlone ? 'p_0000.xhtml' : 'p_cover.xhtml'
-    )
-    templateNavigationDocumentsXhtml = fillTemplate(
-      templateNavigationDocumentsXhtml,
-      '<!-- navigation-list -->',
-      Object.keys(this.contents.indexMap).map((pageIndex) => {
-        const listIndex = this.contents.indexMap[pageIndex]
-        const contentItem = this.contents.list[listIndex]
-        const title = htmlToEscape(contentItem.title)
-
-        if (!coverAlone && pageIndex === '0') {
-          return `<li><a href="text/p_cover.xhtml">${title}</a></li>`
-        }
-
-        return `<li><a href="text/p_${getNumberStr(coverAlone ? +pageIndex : +pageIndex - 1, 4)}.xhtml">${title}</a></li>`
-      }).join('\n')
-    )
-
-    let imageItemStr: string[] = []
-    let pageItemStr: string[] = []
-    let itemRefStr: string[] = []
-    let spread = this.book.coverPosition === 'first-page'
-      ? this.book.pageDirection
-      : this.book.pageDirection === 'left'
-        ? 'right'
-        : 'left'
-
-    this.book.pages.forEach((pageItem, i) => {
-      const numStr = i === 0 ? 'cover' : getNumberStr(i - 1, 4)
-      const imageFileName = (i === 0 ? '' : 'i_') + numStr
-
+    const pages: EpubPageInput[] = []
+    for (let i = 0; i < this.book.pages.length; i++) {
+      const pageItem = this.book.pages[i]
       if (pageItem.blank) {
-        pageItemStr.push(`<item id="p_${numStr}" href="text/p_${numStr}.xhtml" media-type="application/xhtml+xml" properties="svg"></item>`)
-      } else {
-        const mimeType = this.blobs.blobs[pageItem.blobID].blob.type // image/xxxxx
-        pageItemStr.push(`<item id="p_${numStr}" href="text/p_${numStr}.xhtml" media-type="application/xhtml+xml" properties="svg" fallback="${imageFileName}"></item>`)
-        imageItemStr.push(`<item id="${imageFileName}" href="image/${imageFileName}.${mimeType.slice(6)}" media-type="${mimeType}"${i === 0 ? ' properties="cover-image"' : ''}></item>`)
+        pages.push({ blank: true, sticky: pageItem.sticky })
+        continue
       }
+      const blobItem = this.blobs.blobs[pageItem.blobID]
+      if (!blobItem) {
+        throw new Error(`Missing image blob for page ${i + 1}`)
+      }
+      const image = await ensureCoreMediaImage(blobItem)
+      pages.push({
+        blank: false,
+        sticky: pageItem.sticky,
+        image,
+      })
+    }
 
-      if (i !== 0) {
-        itemRefStr.push(`<itemref linear="yes" idref="p_${numStr}" properties="page-spread-${spread}"></itemref>`)
-        spread = spread === 'left' ? 'right' : 'left'
+    const tocEntries = Object.keys(this.contents.indexMap).map((pageIndex) => {
+      const listIndex = this.contents.indexMap[pageIndex]
+      const contentItem = this.contents.list[listIndex]
+      return {
+        pageIndex: +pageIndex,
+        title: contentItem?.title || '',
       }
     })
 
-    if (coverAlone) {
-      // The cover xhtml is neither in the manifest nor written to the archive;
-      // only the cover image itself (properties="cover-image") is kept.
-      pageItemStr.splice(0, 1)
-    } else { // this.book.coverPosition === 'first-page'
-      itemRefStr.unshift(`<itemref linear="yes" idref="p_cover" properties="rendition:page-spread-center"></itemref>`)
-    }
-
-    const viewPortWidth = this.book.pageSize[0] + ''
-    const viewPortHeight = this.book.pageSize[1] + ''
-    const fitMode = this.book.pageFit
-    const bookTitle = htmlToEscape(this.book.bookTitle.trim())
-
-    if (this.book.imgTag === 'svg') {
-      this.book.pages.forEach((pageItem, i) => {
-        const numStr = i === 0 ? 'cover' : getNumberStr(i - 1, 4)
-
-        if (pageItem.blank) {
-          if (i === 0 && coverAlone) {
-            return
-          }
-          Zip.file(
-            `OEBPS/text/p_${numStr}.xhtml`,
-            fillTemplate(templatePageXhtml, '{{title}}', bookTitle)
-              .replace(new RegExp('{{width}}', 'gm'), viewPortWidth)
-              .replace(new RegExp('{{height}}', 'gm'), viewPortHeight)
-              .replace('{{image}}', '')
-          )
-          return
-        }
-
-        const blob = this.blobs.blobs[pageItem.blobID].blob
-        const ext = blob.type.slice(6)
-        const imageFileName = (i === 0 ? '' : 'i_') + numStr + '.' + ext
-
-        Zip.file(`OEBPS/image/${imageFileName}`, blob)
-
-        if (i === 0 && coverAlone) {
-          // standalone cover: image only, no xhtml page
-          return
-        }
-
-        let par = 'none'
-        if (fitMode !== 'stretch') {
-          par = this.book.pagePosition === 'center'
-            ? 'xMidYMid '
-            : this.book.pageDirection === 'left'
-              ? (i + 1) % 2 === 1 ? 'xMaxYMid ' : 'xMinYMid '
-              : (i + 1) % 2 === 1 ? 'xMinYMid ' : 'xMaxYMid '
-
-          if (fitMode === 'fit') {
-            par += 'meet'
-          } else { // props.imageFit === 'fill'
-            par += 'slice'
-          }
-        }
-
-        Zip.file(
-          `OEBPS/text/p_${numStr}.xhtml`,
-          fillTemplate(templatePageXhtml, '{{title}}', bookTitle)
-            .replace(new RegExp('{{width}}', 'gm'), viewPortWidth)
-            .replace(new RegExp('{{height}}', 'gm'), viewPortHeight)
-            .replace('{{image}}', `<image width="100%" height="100%" preserveAspectRatio="${par}" xlink:href="../image/${imageFileName}" />`)
-        )
-      })
-    } else { // this.book.imgTag === 'img'
-      this.book.pages.forEach((pageItem, i) => {
-        const numStr = i === 0 ? 'cover' : getNumberStr(i - 1, 4)
-
-        if (pageItem.blank) {
-          if (i === 0 && coverAlone) {
-            return
-          }
-          Zip.file(
-            `OEBPS/text/p_${numStr}.xhtml`,
-            fillTemplate(templatePageImgXhtml, '{{title}}', bookTitle)
-              .replace(new RegExp('{{width}}', 'gm'), viewPortWidth)
-              .replace(new RegExp('{{height}}', 'gm'), viewPortHeight)
-              .replace(`<img src="{{imageSource}}" style="{{style}}"/>`, '<div style="width:100%;height:100%;"></div>')
-          )
-          return
-        }
-
-        const blob = this.blobs.blobs[pageItem.blobID].blob
-        const ext = blob.type.slice(6)
-        const imageFileName = (i === 0 ? '' : 'i_') + numStr + '.' + ext
-
-        Zip.file(`OEBPS/image/${imageFileName}`, blob)
-
-        if (i === 0 && coverAlone) {
-          // standalone cover: image only, no xhtml page
-          return
-        }
-
-        let imgStyle = 'object-fit:fill'
-        if (fitMode !== 'stretch') {
-          imgStyle = 'object-position:'
-
-          imgStyle += (
-            this.book.pagePosition === 'center'
-              ? 'center;'
-              : this.book.pageDirection === 'left'
-                ? (i + 1) % 2 === 1 ? 'right;' : 'left;'
-                : (i + 1) % 2 === 1 ? 'left;' : 'right;'
-          )
-
-          if (fitMode === 'fit') {
-            imgStyle += 'object-fit:contain'
-          } else { // props.imageFit === 'fill'
-            imgStyle += 'object-fit:cover'
-          }
-        }
-
-        Zip.file(
-          `OEBPS/text/p_${numStr}.xhtml`,
-          fillTemplate(templatePageImgXhtml, '{{title}}', bookTitle)
-            .replace(new RegExp('{{width}}', 'gm'), viewPortWidth)
-            .replace(new RegExp('{{height}}', 'gm'), viewPortHeight)
-            .replace('{{imageSource}}', `../image/${imageFileName}`)
-            .replace('{{style}}', imgStyle)
-        )
-      })
-    }
-
-    let authorsStr = this.book.bookAuthors.map((name, i) => {
-      return [
-        `<dc:creator id="creator${i + 1}">${htmlToEscape(name)}</dc:creator>`,
-        `<meta refines="#creator${i + 1}" property="role" scheme="marc:relators">aut</meta>`,
-        `<meta refines="#creator${i + 1}" property="file-as"></meta>`,
-        `<meta refines="#creator${i + 1}" property="display-seq">${i + 1}</meta>`
-      ].join('\n')
-    }).join('\n')
-
-    templateStandardOpf = templateStandardOpf
-      .replace('{{uuid}}', () => htmlToEscape(this.book.bookID))
-      .replace('{{title}}', () => bookTitle)
-      .replace('<!-- creator-list -->', () => authorsStr)
-      .replace('{{subject}}', () => htmlToEscape(this.book.bookSubject))
-      .replace('{{publisher}}', () => htmlToEscape(this.book.bookPublisher))
-      .replace('{{spread}}', this.book.pageShow === 'one' ? 'none' : 'landscape')
-      .replace('{{createTime}}', new Date().toISOString())
-      .replace(new RegExp('{{width}}', 'gm'), viewPortWidth)
-      .replace(new RegExp('{{height}}', 'gm'), viewPortHeight)
-      .replace('<!-- item-image -->', () => imageItemStr.join('\n'))
-      .replace('<!-- item-xhtml -->', () => pageItemStr.join('\n'))
-      .replace('<!-- itemref-xhtml -->', () => itemRefStr.join('\n'))
-      .replace('{{direction}}', this.book.pageDirection === 'right' ? ' page-progression-direction="rtl"' : '')
-
-    Zip.file('META-INF/container.xml', templateContainerXml)
-    Zip.file('OEBPS/style/fixed-layout-jp.css', templateFixedLayoutJpCss)
-    Zip.file('OEBPS/navigation-documents.xhtml', templateNavigationDocumentsXhtml)
-    Zip.file('OEBPS/standard.opf', templateStandardOpf)
+    const Zip = buildEpubZip({
+      bookID: this.book.bookID,
+      fallbackUuid: uuid(),
+      bookTitle: this.book.bookTitle,
+      bookAuthors: toJS(this.book.bookAuthors),
+      bookSubject: this.book.bookSubject,
+      bookPublisher: this.book.bookPublisher,
+      bookLanguage: this.book.bookLanguage,
+      pageSize: toJS(this.book.pageSize),
+      pagePosition: this.book.pagePosition,
+      pageShow: this.book.pageShow,
+      pageFit: this.book.pageFit,
+      pageBackgroundColor: this.book.pageBackgroundColor,
+      pageDirection: this.book.pageDirection,
+      coverPosition: this.book.coverPosition,
+      imgTag: this.book.imgTag,
+      pages,
+      tocEntries,
+    })
 
     const blob = await Zip.generateAsync({
       type: 'blob',
@@ -599,6 +472,7 @@ autorun(() => {
       bookAuthors: toJS(store.book.bookAuthors),
       bookSubject: store.book.bookSubject,
       bookPublisher: store.book.bookPublisher,
+      bookLanguage: store.book.bookLanguage,
     },
     pageSettings: {
       pageSize: toJS(store.book.pageSize),

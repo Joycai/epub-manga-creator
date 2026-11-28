@@ -152,6 +152,9 @@ const ModalBook = observer(function() {
     const eventTarget = e.currentTarget as HTMLInputElement;
     storeBook.updateBookPageProperty('bookPublisher', eventTarget.value);
   }, [storeBook]);
+  const onChangeBookLanguage = useCallback((e: FormEvent<HTMLInputElement>) => {
+    storeBook.updateBookPageProperty('bookLanguage', e.currentTarget.value);
+  }, [storeBook]);
 
   const onChangeTitleFromPicker = useCallback((value: string) => {
     storeBook.updateBookPageProperty('bookTitle', value);
@@ -328,6 +331,26 @@ const ModalBook = observer(function() {
               <div className={keywordsLength ? "mt-3" : ''}>
                 <KeywordPicker keywords={keywords} onClick={onChangePublisherFromPicker}/>
               </div>
+            </div>
+          </div>
+          <div className="mb-3 row">
+            <label htmlFor="input-book-language" className="col-sm-2 col-form-label text-end">{t.book.language}</label>
+            <div className="col-sm-10">
+              <input
+                type="text"
+                className="form-control"
+                list="dl-language"
+                id="input-book-language"
+                value={storeBook.bookLanguage}
+                onInput={onChangeBookLanguage}
+              />
+              <datalist id="dl-language">
+                <option value="ja" />
+                <option value="zh-CN" />
+                <option value="zh-TW" />
+                <option value="en" />
+                <option value="ko" />
+              </datalist>
             </div>
           </div>
         </div>
